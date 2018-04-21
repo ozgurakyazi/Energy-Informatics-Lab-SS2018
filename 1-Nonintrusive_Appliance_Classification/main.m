@@ -1,4 +1,4 @@
-[y, Fs] = audioread('./whited/AC_Electrolux_r5_MK2_20151031065948.flac');
+[y, Fs] = audioread('./whited/AC_Electrolux_r5_MK2_20151031065948.flac'); % example audioread to get Fs for further use.
 %**************** Exercise 3 ****************
 V = rand(10, 2000); % random data for volt.
 I = rand(10, 2000); % random data for current.
@@ -16,7 +16,7 @@ inrush_point_num = Fs * msec_duration/1000; % Duration in seconds multiplied wit
 ICR = rms(I(:, 1:inrush_point_num), 2) ./ rms(I(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush current ratio
 
 
-% inrush voltage ratio, additional feature trial. 
+% inrush voltage ratio, additional feature trial.
 % TO BE TESTED
 VCR = rms(V(:, 1:inrush_point_num), 2) ./ rms(V(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush voltage ratio
 
