@@ -4,6 +4,11 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
   %   class - cell array containing labels
   %   Fs - frequency of the appliances
     % ***************** Exercise 1 ************************
+    % read 1 file just to learn Fs.
+    fname = strcat('data/', files(1).name);
+    [X, Fs] = audioread(fname);
+    
+
     V_all = [];
     I_all = [];
     %r_t =   2000;
@@ -12,6 +17,17 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
     %class = zeros(length(files),1);
     %Fs = zeros(length(files),1);
     %replace length(files) with a small number for testing
+
+
+    %Calculating the ROI index
+    roi_begin_ms = 100;   % starting data of roi in miliseconds.
+    roi_end_ms = roi_begin_ms + 500;   % ending data of the roi in miliseconds.
+
+    roi_begin =  (Fs * roi_begin_ms / 1000) + 1 ; % Fs * 1 sec means the data at the end of the 1st second. so ms is converted
+    % to seconds by dividing 1000 and multiplication with Fs gives the data point at that milisecond.
+    % But we should start using the data after the first 100ms, so +1 is added.
+    roi_end = Fs * roi_end_ms / 1000;  % same logic with roi_begin. But this time no +1 since the last is already included.
+
     for k = 1:length(files)
         fname = strcat('data/', files(k).name);
         s = strsplit(fname, '_');
@@ -24,6 +40,10 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
 
         % ***************** Exercise 1 end **************
         % ***************** Exercise 2 **************
+
+        % Cut ROI
+        X_roi = X(roi_begin:roi_end,:); % cut the region
+
         %(a) scale the voltage signal, according to Measurement Kit
         if MKit == 'MK1'
            X(:,1) = X(:,1)*1033.64;
@@ -35,17 +55,7 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
             X(:,1) = X(:,1)*988.926;
             X(:,2) = X(:,2)*60.9562;
         end
-        %X(:,2) = X(:,2)/beta_;
-        
-        %Cut the ROI
-        roi_begin_ms = 100;   % starting data of roi in miliseconds.
-        roi_end_ms = roi_begin_ms + 500;   % ending data of the roi in miliseconds.
 
-        roi_begin =  (Fs * roi_begin_ms / 1000) + 1 ; % Fs * 1 sec means the data at the end of the 1st second. so ms is converted
-        % to seconds by dividing 1000 and multiplication with Fs gives the data point at that milisecond.
-        % But we should start using the data after the first 100ms, so +1 is added.
-        roi_end = Fs * roi_end_ms / 1000;  % same logic with roi_begin. But this time no +1 since the last is already included.
-        X_roi = X(roi_begin:roi_end,:); % cut the region
         V_all = [V_all; X_roi(:,1)']; % transpose is applied, so that this single observation is stored in a line.
         I_all = [I_all; X_roi(:,2)'];
     end
@@ -53,7 +63,3 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
     %I_all = I_all/beta_ ;
      % ***************** Exercise 2 end ******************
 end
-
-
-
-
