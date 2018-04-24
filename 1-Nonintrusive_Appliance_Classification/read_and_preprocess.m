@@ -26,14 +26,14 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
         % ***************** Exercise 2 **************
         %(a) scale the voltage signal, according to Measurement Kit
         if MKit == 'MK1'
-           X(:,1) = X(:,1)/1033.64;
-            X(:,2) = X(:,2)/61.4835;
+           X(:,1) = X(:,1)*1033.64;
+            X(:,2) = X(:,2)*61.4835;
         elseif MKit == 'MK2'
-            X(:,1) = X(:,1)/861.15;
-            X(:,2) = X(:,2)/60.200;
+            X(:,1) = X(:,1)*861.15;
+            X(:,2) = X(:,2)*60.200;
         elseif MKit == 'MK3'
-            X(:,1) = X(:,1)/988.926;
-            X(:,2) = X(:,2)/60.9562;
+            X(:,1) = X(:,1)*988.926;
+            X(:,2) = X(:,2)*60.9562;
         end
         %X(:,2) = X(:,2)/beta_;
         
