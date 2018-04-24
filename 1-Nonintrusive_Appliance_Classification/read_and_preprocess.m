@@ -6,10 +6,9 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
     % ***************** Exercise 1 ************************
     V_all = [];
     I_all = [];
-    Begin = 1;
-    r_t =   2000;
-    R_b = 33;
-    beta_ = r_t/R_b;
+    %r_t =   2000;
+    %R_b = 33;
+    %beta_ = r_t/R_b;
     %class = zeros(length(files),1);
     %Fs = zeros(length(files),1);
     %replace length(files) with a small number for testing
@@ -18,8 +17,8 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
         s = strsplit(fname, '_');
         %get measurement kit
         MKit = s{4};
-        class{k,1} = s{1} ; % save class to the observation.
-
+        %remove 'data/' from the string
+        class{1, k} = strrep(s{1}, 'data/','') ; % save class to the observation.
         % read matrix X = [V I] and sampling frequency y from each file
         [X, Fs] = audioread(fname);
 
@@ -27,17 +26,17 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
         % ***************** Exercise 2 **************
         %(a) scale the voltage signal, according to Measurement Kit
         if MKit == 'MK1'
-            X(:,1) = X(:,1)/1033.64;
-            %X(:,2) = X(:,2)/61.4835;
+           X(:,1) = X(:,1)/1033.64;
+            X(:,2) = X(:,2)/61.4835;
         elseif MKit == 'MK2'
             X(:,1) = X(:,1)/861.15;
-            %X(:,2) = X(:,2)/60.200;
+            X(:,2) = X(:,2)/60.200;
         elseif MKit == 'MK3'
             X(:,1) = X(:,1)/988.926;
-            %X(:,2) = X(:,2)/60.9562;
+            X(:,2) = X(:,2)/60.9562;
         end
-
         %X(:,2) = X(:,2)/beta_;
+        
         %Cut the ROI
         roi_begin_ms = 100;   % starting data of roi in miliseconds.
         roi_end_ms = roi_begin_ms + 500;   % ending data of the roi in miliseconds.
@@ -51,6 +50,10 @@ function [V_all, I_all, class , Fs] = read_and_preprocess(files)
         I_all = [I_all; X_roi(:,2)'];
     end
     %(b) scale the current signal : beta = r_t/R_b
-     I_all = I_all/beta_ ;
+    %I_all = I_all/beta_ ;
      % ***************** Exercise 2 end ******************
 end
+
+
+
+

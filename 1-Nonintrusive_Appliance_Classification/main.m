@@ -2,9 +2,19 @@
 
 files = dir('data/*.flac');
 [V, I, class, Fs] = read_and_preprocess(files);
-size(V)
-size(I)
-size(class)
+
+%Map char classes into integers
+keys = unique(class);
+values = num2cell(1:size(unique(class), 2));
+map = containers.Map(keys, values);
+int_classes = mapAll(map, class);
+%Map Back - for later:
+    %mapBack = containers.Map(values, keys);
+    %mapAll(mapBack, (mapAll(map, class)));
+
+size(V);
+size(I);
+size(class);
 
 %**************** Exercise 3 ****************
 %V = rand(10, 2000); % random data for volt.
