@@ -7,7 +7,7 @@ files = dir('data/*.flac');
 keys = unique(class);
 values = num2cell(1:size(unique(class), 2));
 map = containers.Map(keys, values);
-int_classes = mapAll(map, class);
+int_classes = mapAll(map, class)';
 %Map Back - for later:
     %mapBack = containers.Map(values, keys);
     %mapAll(mapBack, (mapAll(map, class)));
