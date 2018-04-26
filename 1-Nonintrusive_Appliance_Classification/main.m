@@ -41,3 +41,22 @@ data = [P_ROI  ICR  VCR];
 %size(data) % size check
 
 %**************** END Exercise 3 ************
+
+%**************** Exercise 4 ****************
+% dividing the class representatives
+
+% create random index
+randomidx = randperm(size(data,1));
+
+% dividing class to training set (2/3 amount of samples) and test set (1/3
+% amount of samples)
+trainNumber = ceil(2*size(data,1)/3);
+trainData = data(randomidx(1:trainNumber), :);
+trainLabels = class(:, randomidx(1:trainNumber));
+testData = data(randomidx(trainNumber+1:end), :);
+
+% classification using K-Nearest Neighbour (k=3)
+model = fitcknn(trainData,trainLabels,'NumNeighbors',3,'Standardize',1);
+Y = predict(model,testData);
+
+%**************** END Exercise 4 ************
