@@ -7,7 +7,7 @@ files = dir('data/*.flac');
 keys = unique(class);
 values = num2cell(1:size(unique(class), 2));
 map = containers.Map(keys, values);
-int_classes = mapAll(map, class)';
+int_classes = cell2mat(mapAll(map, class)');
 %Map Back - for later:
     %mapBack = containers.Map(values, keys);
     %mapAll(mapBack, (mapAll(map, class)));
@@ -37,7 +37,7 @@ ICR = rms(I(:, 1:inrush_point_num), 2) ./ rms(I(:, (size(I, 2)-inrush_point_num+
 % TO BE TESTED
 VCR = rms(V(:, 1:inrush_point_num), 2) ./ rms(V(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush voltage ratio
 
-data = [P_ROI  ICR  VCR];
+data = [P_ROI  ICR];
 %size(data) % size check
 
 %**************** END Exercise 3 ************
@@ -52,11 +52,15 @@ randomidx = randperm(size(data,1));
 % amount of samples)
 trainNumber = ceil(2*size(data,1)/3);
 trainData = data(randomidx(1:trainNumber), :);
-trainLabels = class(:, randomidx(1:trainNumber));
+trainLabels = int_classes(randomidx(1:trainNumber), :);
+size(trainLabels)
 testData = data(randomidx(trainNumber+1:end), :);
+testLabels = int_classes(randomidx(trainNumber+1:end), :);
 
 % classification using K-Nearest Neighbour (k=3)
-model = fitcknn(trainData,trainLabels,'NumNeighbors',3,'Standardize',1);
+model = fitcknn(trainData,trainLabels,'NumNeighbors',10,'Standardize',1);
 Y = predict(model,testData);
+
+accuracy = calculate_accuracy(Y,testLabels)
 
 %**************** END Exercise 4 ************
