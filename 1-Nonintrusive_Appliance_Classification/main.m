@@ -43,24 +43,19 @@ data = [P_ROI  ICR];
 %**************** END Exercise 3 ************
 
 %**************** Exercise 4 ****************
-% dividing the class representatives
 
-% create random index
-randomidx = randperm(size(data,1));
+%call classifier function
 
-% dividing class to training set (2/3 amount of samples) and test set (1/3
-% amount of samples)
-trainNumber = ceil(2*size(data,1)/3);
-trainData = data(randomidx(1:trainNumber), :);
-trainLabels = int_classes(randomidx(1:trainNumber), :);
-size(trainLabels)
-testData = data(randomidx(trainNumber+1:end), :);
-testLabels = int_classes(randomidx(trainNumber+1:end), :);
-
-% classification using K-Nearest Neighbour (k=3)
-model = fitcknn(trainData,trainLabels,'NumNeighbors',10,'Standardize',1);
-Y = predict(model,testData);
-
-accuracy = calculate_accuracy(Y,testLabels)
+%UNCOMMENT to running Exercise 4
+% classifier(data, int_classes);
 
 %**************** END Exercise 4 ************
+
+%**************** Exercise 5 ****************
+
+%call cross validation function using spesific classifier: 'knn' or 'svm'
+%UNCOMMENT to running Exercise 5
+% cvmodel = crossvalidation(data, class, 'knn');
+% cvmodel = crossvalidation(data, class, 'svm');
+
+%**************** END Exercise 5 ************
