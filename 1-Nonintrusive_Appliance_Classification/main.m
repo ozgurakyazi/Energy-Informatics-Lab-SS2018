@@ -2,7 +2,7 @@
 tic; %add timer for analysis
 
 files = dir('data/*.flac');
-%[V, I, class, Fs] = read_and_preprocess(files);
+[V, I, class, Fs] = read_and_preprocess(files);
 
 %Map char classes into integers
 keys = unique(class);
@@ -38,9 +38,10 @@ ICR = rms(I(:, 1:inrush_point_num), 2) ./ rms(I(:, (size(I, 2)-inrush_point_num+
 % TO BE TESTED
 VCR = rms(V(:, 1:inrush_point_num), 2) ./ rms(V(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush voltage ratio
 
-peak_volt = max(V')'
+peak_volt = max(V')';
 
 data = [P_ROI  ICR peak_volt];
+%data =(data - mean(data))./std(data); % normalize data
 %size(data) % size check
 
 %**************** END Exercise 3 ************

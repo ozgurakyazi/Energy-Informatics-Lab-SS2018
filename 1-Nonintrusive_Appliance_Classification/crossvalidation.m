@@ -38,7 +38,7 @@ function [accuracyCV] = crossvalidation(trainData, trainLabels, classifier)
       switch classifier
         % classification using K-Nearest Neighbour (k=NumNeighbors)
           case 'knn'
-              NumNeighbors = 10;
+              NumNeighbors = 3;
               cvmodel = fitcknn(trainDataCV,trainLabelsCV,'NumNeighbors',NumNeighbors,'Standardize',1);
               Y = predict(cvmodel,testDataCV);
 
