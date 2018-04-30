@@ -18,9 +18,6 @@ int_classes = cell2mat(mapAll(map, class)');
 % size(class);
 
 %**************** Exercise 3 ****************
-%V = rand(10, 2000); % random data for volt.
-%I = rand(10, 2000); % random data for current.
-
 %Feature 1
 P_ROI = rms(V,2) .* rms(I,2);   % power for region of interest.
 
