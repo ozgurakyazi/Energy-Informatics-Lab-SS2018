@@ -33,9 +33,10 @@ inrush_point_num = Fs * msec_duration/1000; % Duration in seconds multiplied wit
 %size(I(:, (size(I, 2)-inrush_point_num+1):end  ))  % check size if needed
 ICR = rms(I(:, 1:inrush_point_num), 2) ./ rms(I(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush current ratio
 
-
-% inrush voltage ratio, additional feature trial.
-%VCR = rms(V(:, 1:inrush_point_num), 2) ./ rms(V(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush voltage ratio
+% We create two additional feature and try whether it improve accuracy or not
+                       
+% inrush voltage ratio, additional feature trial. Not significantly improve accuracy
+% VCR = rms(V(:, 1:inrush_point_num), 2) ./ rms(V(:, (size(I, 2)-inrush_point_num+1):end  ),2); % inrush voltage ratio
 
 peak_volt = max(V')'; % extra feature. After experiments we found that this helps our crossvalidation accuracy increase about 10%;
 
