@@ -1,4 +1,5 @@
 %[y, Fs] = audioread('./whited/AC_Electrolux_r5_MK2_20151031065948.flac'); % example audioread to get Fs for further use.
+tic; %add timer for analysis
 
 files = dir('data/*.flac');
 [V, I, class, Fs] = read_and_preprocess(files);
@@ -44,10 +45,11 @@ data = [P_ROI  ICR];
 
 %**************** Exercise 4 ****************
 
-%call classifier function
+%call classifier function: 'knn' or 'svm'
 
 %UNCOMMENT to running Exercise 4
- classifier(data, int_classes);
+% classifier(data, int_classes, 'knn');
+% classifier(data, int_classes, 'svm');
 
 %**************** END Exercise 4 ************
 
@@ -55,7 +57,8 @@ data = [P_ROI  ICR];
 
 %call cross validation function using spesific classifier: 'knn' or 'svm'
 %UNCOMMENT to running Exercise 5
- cvmodel = crossvalidation(data, int_classses, 'knn'); % our choice is knn. You may use svm also.
- %cvmodel = crossvalidation(data, int_classes, 'svm');
+% crossvalidation(data, int_classes, 'knn'); % our choice is knn. You may use svm also.
+% crossvalidation(data, int_classes, 'svm');
 
 %**************** END Exercise 5 ************
+toc %add timer for analysis

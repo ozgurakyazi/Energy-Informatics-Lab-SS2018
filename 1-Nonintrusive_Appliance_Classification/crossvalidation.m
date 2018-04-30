@@ -29,7 +29,7 @@ function [accuracyCV] = crossvalidation(trainData, trainLabels, classifier)
           trainDataCV = [data1;data2];
           trainLabelsCV = [label1;label2];
 
-      else
+      else % handle case for last fold when data ammount divided by fold numbers is not an integer
           testDataCV = trainData(idx+1:n,:);
           trueLabelsCV = trainLabels(idx+1:n,:);
           trainDataCV = trainData(1:idx,:);
