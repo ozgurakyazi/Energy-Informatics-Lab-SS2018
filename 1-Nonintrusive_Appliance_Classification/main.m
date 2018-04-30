@@ -47,7 +47,7 @@ data = [P_ROI  ICR];
 %call classifier function
 
 %UNCOMMENT to running Exercise 4
-% classifier(data, int_classes);
+ classifier(data, int_classes);
 
 %**************** END Exercise 4 ************
 
@@ -55,7 +55,7 @@ data = [P_ROI  ICR];
 
 %call cross validation function using spesific classifier: 'knn' or 'svm'
 %UNCOMMENT to running Exercise 5
-% cvmodel = crossvalidation(data, class, 'knn');
-% cvmodel = crossvalidation(data, class, 'svm');
+ cvmodel = crossvalidation(data, int_classses, 'knn'); % our choice is knn. You may use svm also.
+ %cvmodel = crossvalidation(data, int_classes, 'svm');
 
 %**************** END Exercise 5 ************
