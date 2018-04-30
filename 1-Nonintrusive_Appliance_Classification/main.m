@@ -13,9 +13,9 @@ int_classes = cell2mat(mapAll(map, class)');
     %mapBack = containers.Map(values, keys);
     %mapAll(mapBack, (mapAll(map, class)));
 
-size(V);
-size(I);
-size(class);
+% size(V);
+% size(I);
+% size(class);
 
 %**************** Exercise 3 ****************
 %V = rand(10, 2000); % random data for volt.
@@ -48,8 +48,8 @@ data = [P_ROI  ICR];
 %call classifier function: 'knn' or 'svm'
 
 %UNCOMMENT to running Exercise 4
-% classifier(data, int_classes, 'knn');
-% classifier(data, int_classes, 'svm');
+  classifier(data, int_classes, 'knn');
+%  classifier(data, int_classes, 'svm');
 
 %**************** END Exercise 4 ************
 
@@ -57,8 +57,8 @@ data = [P_ROI  ICR];
 
 %call cross validation function using spesific classifier: 'knn' or 'svm'
 %UNCOMMENT to running Exercise 5
-% crossvalidation(data, int_classes, 'knn'); % our choice is knn. You may use svm also.
-% crossvalidation(data, int_classes, 'svm');
+  crossvalidation(data, int_classes, 'knn'); % our choice is knn. You may use svm also.
+%  crossvalidation(data, int_classes, 'svm');
 
 %**************** END Exercise 5 ************
 toc %add timer for analysis

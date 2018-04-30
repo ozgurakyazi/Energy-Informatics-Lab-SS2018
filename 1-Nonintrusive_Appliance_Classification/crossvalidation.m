@@ -1,7 +1,7 @@
 function [accuracyCV] = crossvalidation(trainData, trainLabels, classifier)
 
   % create random index and randomize data
-  n = size(trainData,1)
+  n = size(trainData,1);
   randomidx = randperm(n);
 
   trainData = trainData(randomidx,:);
