@@ -14,20 +14,20 @@ testData = data(randomidx(trainNumber+1:end), :);
 trueLabels = labels(randomidx(trainNumber+1:end), :);
 
 switch alg
-    
+
     case 'knn'
 
         % classification using K-Nearest Neighbour (k=NumNeighbors)
-        NumNeighbors = 10;
+        NumNeighbors = 3;
         model = fitcknn(trainData,trainLabels,'NumNeighbors',NumNeighbors,'Standardize',1);
         Y = predict(model,testData);
 
     case 'svm'
-        
+
         t = templateSVM('Standardize',1);
         SVMmodel = fitcecoc(trainData, trainLabels,'Learners',t);
         Y = predict(SVMmodel, testData);
-        
+
 end
 
 % accuracy calculation
