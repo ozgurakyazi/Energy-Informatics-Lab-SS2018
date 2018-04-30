@@ -2,7 +2,7 @@
 tic; %add timer for analysis
 
 files = dir('data/*.flac');
-%[V, I, class, Fs] = read_and_preprocess(files);
+[V, I, class, Fs] = read_and_preprocess(files);
 
 %Map char classes into integers
 keys = unique(class);
