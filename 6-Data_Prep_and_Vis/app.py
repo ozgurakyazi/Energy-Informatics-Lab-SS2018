@@ -211,13 +211,40 @@ app.layout = html.Div(children=[
     # '''),
     html.Div([
         html.Div([
+            html.Div([
+                dcc.Dropdown(
+                    id="hour",
+                    options=[{"label":i,"value":i} for i in range(24)],
+                    value = "Start Hour:",
+                ),
+                ],
+                style={"display":"inline-block", "width":"33%"}
+            ),
+            html.Div([
+                dcc.Dropdown(
+                    id="minute",
+                    options=[{"label":i,"value":i} for i in range(60)],
+                    value = "Start Minute:",
+                ),
+                ],
+                style={"display":"inline-block", "width":"33%"}
+            ),
+            html.Div([
+                dcc.Dropdown(
+                    id="second",
+                    options=[{"label":i,"value":i} for i in range(60)],
+                    value = "Start Seconds:",
+                ),
+                ],
+                style={"display":"inline-block", "width":"33%"}
+            ),
             dcc.Dropdown(
-            id='graph_type',
-            options=[{"label":"Aggregated Signals","value":0},{"label":"Individual Signals","value":1}],
-            value=0,
+                id='graph_type',
+                options=[{"label":"Aggregated Signals","value":0},{"label":"Individual Signals","value":1}],
+                value=0,
             ),
         ],
-        style= {"width":"50%", "display":"inline-block"}
+        style= {"width":"30%", "display":"inline-block"}
         ),
         html.Div([
             dcc.Dropdown(
@@ -225,7 +252,7 @@ app.layout = html.Div(children=[
                 value = 1,
             ),
         ],
-        style= {"width":"50%", "display":"inline-block"}
+        style= {"width":"30%", "display":"inline-block"}
         )
         ],
     ),
@@ -265,23 +292,29 @@ def update_phases_options(graph_type):
     [
         Input("graph_type","value"),
         Input("phases", "value"),
+        Input("hour","value"),
+        Input("minute","value"),
+        Input("second","value"),
     ]
 )
-def update_graph(graph_type,phase):
+def update_graph(graph_type,phase,hour,minute,second):
     the_mode= "markers+lines"
     title = ""
     data_fields = ""
+    sps = 0
     #print(blond.list_files().keys())
     if graph_type == 0: ## aggregated signals
         title = "Aggregated Signals"
         data_fields = ["clear"]
+        sps = 50000
     elif graph_type == 1: ## individual signals
         title = "Individual Signals"
         data_fields = [key for key in blond.list_files().keys() if key.startswith("medal")]
+        sps = 6400
 
     graph_list = []
     for data_field in data_fields:
-        temp_data = blond.list_files()[data_field][0]["current"+str(phase)]
+        temp_data = blond.list_files()[data_field][0]["current"+str(phase)][0:sps*10]
         len_data = temp_data.shape[0]
         print("length of "+data_field + "is:"+str(len_data))
         print()
