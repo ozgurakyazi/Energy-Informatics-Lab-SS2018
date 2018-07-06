@@ -1,6 +1,7 @@
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+import plotly.graph_objs as go
 import pandas as pd
 import numpy as np
 import h5py
@@ -164,23 +165,27 @@ blond = Blond(date(2016,10,5))
 
 """ Define a timeframe"""
 start_ts = time(0,10,0) # start_hours_minutes
-end_ts   = time(0,20,0)
+end_ts   = time(0,10,10)
 
 """Read MEDAL and CLEAR data """
 blond.read_files(start_ts, end_ts)
 
 
 """Checking if files have been retrieved"""
-blond.list_files()
+print("list the files:")
+print(blond.list_files())
 
 ##########################
 """signals acquisited by MEDAL"""
-medal_file = blond.list_files()['medal-1'][0]
-[key for key in medal_file.keys()]
+print("Files from Medal 1")
+medal_file = blond.list_files()['medal-2'][0]
+print(type(medal_file["current1"]))
+print([key for key in medal_file.keys()])
 ##########################
 """signals acquisited by CLEAR"""
+print("Keys from CLEAR")
 clear_file = blond.list_files()['clear'][0]
-[key for key in clear_file.keys()]
+print([key for key in clear_file.keys()])
 ##########################
 device = 'medal-2'
 signal = 'current1'
@@ -199,29 +204,111 @@ blond.center_and_calibrate(dict_signal)
 app = dash.Dash()
 
 app.layout = html.Div(children=[
-    html.H3(children='Hello Dash'),
+    html.H3(children='BLOND Dataset'),
 
     # html.Div(children='''
     #     Dash: A web application framework for Python.
     # '''),
-    dcc.Slider(
-        min=0,
-        max =10,
-        marks = {i: 'Label {}'.format(i) for i in range(10)},
+    html.Div([
+        html.Div([
+            dcc.Dropdown(
+            id='graph_type',
+            options=[{"label":"Aggregated Signals","value":0},{"label":"Individual Signals","value":1}],
+            value=0,
+            ),
+        ],
+        style= {"width":"50%", "display":"inline-block"}
+        ),
+        html.Div([
+            dcc.Dropdown(
+                id="phases",
+                value = 1,
+            ),
+        ],
+        style= {"width":"50%", "display":"inline-block"}
+        )
+        ],
+    ),
+    dcc.RangeSlider(
+        id="timerange",
+        count=1,
+        min=-5,
+        max=10,
+        step=0.5,
+        value=[-3, 7]
     ),
     dcc.Graph(
-        id='example-graph',
-        figure={
-            'data': [
-                {'x': [1, 2, 3], 'y': [4, 1, 2], 'type': 'bar', 'name': 'SF'},
-                {'x': [1, 2, 3], 'y': [2, 4, 5], 'type': 'bar', 'name': u'Montréal'},
-            ],
-            'layout': {
-                'title': 'Dash Data Visualization'
-            }
-        }
+        id='graph',
     )
 ])
+
+app.scripts.config.serve_locally = True
+app.css.config.serve_locally = True
+
+from dash.dependencies import Input, Output
+
+@app.callback(
+    Output("phases", "options"),
+    [
+        Input("graph_type","value"),
+    ]
+)
+def update_phases_options(graph_type):
+    if graph_type == 0: ## aggregated signals
+        return [{"label":"Phase:"+str(i), "value":i} for i in range(1,4)]
+    elif graph_type == 1: ## individual signals
+        return [{"label":"Phase:"+str(i), "value":i} for i in range(1,7)]
+
+
+@app.callback(
+    Output("graph", "figure"),
+    [
+        Input("graph_type","value"),
+        Input("phases", "value"),
+    ]
+)
+def update_graph(graph_type,phase):
+    the_mode= "markers+lines"
+    title = ""
+    data_fields = ""
+    #print(blond.list_files().keys())
+    if graph_type == 0: ## aggregated signals
+        title = "Aggregated Signals"
+        data_fields = ["clear"]
+    elif graph_type == 1: ## individual signals
+        title = "Individual Signals"
+        data_fields = [key for key in blond.list_files().keys() if key.startswith("medal")]
+
+    graph_list = []
+    for data_field in data_fields:
+        temp_data = blond.list_files()[data_field][0]["current"+str(phase)]
+        len_data = temp_data.shape[0]
+        print("length of "+data_field + "is:"+str(len_data))
+        print()
+        temp_graph = go.Scatter(
+            x = np.linspace(1,15,len_data),
+            y = temp_data[()],
+            mode=the_mode,
+            name=data_field.title()
+        )
+        graph_list.append(temp_graph)
+
+    print("returning from update graph")
+    return go.Figure(
+        data = graph_list,
+        layout = go.Layout(
+            title = title,
+            showlegend = True,
+            legend = go.Legend(
+                x = 0,
+                y = 1.0
+            ),
+            margin = go.Margin(
+                l=80, r=80, t=60, b=30
+            ),
+        ),
+    )
+
 
 if __name__ == '__main__':
     app.run_server(debug=True,port=8051)
