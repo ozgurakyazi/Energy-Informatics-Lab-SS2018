@@ -40,9 +40,12 @@ class Blond(object):
 
     def find_corresponding_file(self, the_time,all_timestamps):
         current_ts = all_timestamps[0]
+        print("the time:"+ str(the_time))
+        print("first time:"+str(current_ts))
         i=1
         try:
             while the_time >= current_ts:
+                print("temp time:"+str(current_ts))
                 current_ts = all_timestamps[i]
                 i+=1
         except: # in case requested time is in the last index of the list, we will have a error in [i]. so this except makes the index work.
@@ -63,7 +66,7 @@ class Blond(object):
         timestamps = self._regex_map(pattern, files)
         time_format = '%Y-%m-%dT%H-%M-%S'
         timestamps = list(map(lambda ts: datetime.strptime(ts, time_format ).time(), timestamps))
-
+        timestamps.sort()
         """ get the first file timestamp"""
         current_ts = timestamps[0]
         i=1
@@ -71,6 +74,7 @@ class Blond(object):
             current_ts = timestamps[i]
             i+=1
         file_index = self.find_corresponding_file(start_ts,timestamps)
+        print("start file index:"+str(file_index))
         if file_index < 0: #no file found
             return [],[]
 
@@ -118,7 +122,9 @@ class Blond(object):
         for folder in glob.glob(path_to_medals):
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
+            print("now reading medal:"+medal_name)
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all, start_ts, end_ts,folder)
+            print("#############################")
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
 
@@ -186,7 +192,7 @@ def get_time_diff(t1,t2):
 blond = Blond(date(2016,10,5))
 
 """ Define a timeframe"""
-start_ts = time(0,10,0) # start_hours_minutes
+start_ts = time(0,50,0) # start_hours_minutes
 end_ts   = time(1,10,10)
 
 """Read MEDAL and CLEAR data """
@@ -227,26 +233,28 @@ def create_options():
     hours = int(minutes/60)
 
     options={"seconds":[],"minutes":[],"hours":[], "critical":{"minutes":[],"seconds":[]} }
-    if seconds>59:
+    if seconds>59 or (start_ts.minute != end_ts.minute):
         options["seconds"] = [{"label":i,"value":i} for i in range(60)]
-        if minutes>59:
+        if minutes>59 or (start_ts.minute != end_ts.minute):
             options["minutes"] = [{"label":i,"value":i} for i in range(60)]
             resid_min = minutes % 60
-            options["critical"]["minutes"] = [{"label":i,"value":i} for i in range()]
+            #options["critical"]["minutes"] = [{"label":i,"value":i} for i in range()]
         else:
             options["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,start_ts.minute+minutes+1)]
             options["critical"]["minutes"] = options["minutes"]
 
-        options["hours"] = [{"label":i,"value":i} for i in range(start_ts.hour,start_ts.hour+hours+1)]
+        #options["hours"] = [{"label":i,"value":i} for i in range(start_ts.hour,start_ts.hour+hours+1)]
     else:
         options["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,start_ts.second+seconds+1)]
         options["critical"]["seconds"] = options["seconds"]
         options["minutes"] = [{"label":start_ts.minute,"value":start_ts.minute} ]
         options["critical"]["minutes"] = options["minutes"]
-        options["hours"] = [{"label":start_ts.hour,"value":start_ts.hour} ]
-    return options, criticals
+        #options["hours"] = [{"label":start_ts.hour,"value":start_ts.hour} ]
 
-time_options,critical_times = create_options()
+    options["hours"] = [{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)]
+    return options
+
+time_options = create_options()
 ##########################
 
 app = dash.Dash()
@@ -342,27 +350,27 @@ def update_phases_options(graph_type):
         return [{"label":"Phase:"+str(i), "value":i} for i in range(1,7)]
 
 
-@app.callback(
-    Output("graph", "figure"),
-    [
-        Input("graph_type","value"),
-        Input("phases", "value"),
-        Input("hour","value"),
-        Input("minute","value"),
-        Input("second","value"),
-    ]
-)
-@app.callback(
-    Output("minute", "options"),
-    [
-        Input("hour","value"),
-    ]
-)
-def update_minute_options(hour):
-    if hour == critical_times["hour"]:
-
-    else:
-        return time_options
+# @app.callback(
+#     Output("graph", "figure"),
+#     [
+#         Input("graph_type","value"),
+#         Input("phases", "value"),
+#         Input("hour","value"),
+#         Input("minute","value"),
+#         Input("second","value"),
+#     ]
+# )
+# @app.callback(
+#     Output("minute", "options"),
+#     [
+#         Input("hour","value"),
+#     ]
+# )
+# def update_minute_options(hour):
+#     if hour == critical_times["hour"]:
+#
+#     else:
+#         return time_options
 
 @app.callback(
     Output("graph", "figure"),
@@ -429,4 +437,4 @@ def update_graph(graph_type,phase,hour,minute,second):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True,port=8051)
+    app.run_server(debug=False,port=8051)
