@@ -65,11 +65,6 @@ class Blond(object):
         timestamps = list(map(lambda ts: datetime.strptime(ts, time_format ).time(), timestamps))
         timestamps.sort()
         """ get the first file timestamp"""
-        current_ts = timestamps[0]
-        i=1
-        while start_ts >= current_ts:
-            current_ts = timestamps[i]
-            i+=1
         file_index = self.find_corresponding_file(start_ts,timestamps)
         #print("start file index:"+str(file_index))
         if file_index < 0: #no file found
@@ -116,7 +111,9 @@ class Blond(object):
         """READING MEDAL UNITS"""
 
         path_to_medals = './data/medal*/'
-        for folder in glob.glob(path_to_medals):
+        folders_list =glob.glob(path_to_medals)
+        folders_list.sort()
+        for folder in folders_list:
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all, start_ts, end_ts,folder)
@@ -228,9 +225,10 @@ def create_options():
     hours = int(minutes/60)
 
     options={
-        "seconds":[{"label":i,"value":i} for i in range(60)],
-        "minutes":[{"label":i,"value":i} for i in range(60)],
-        "hours":[{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)],
+        "duration":[{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i/10.0)+" sec","value":i/10.0} for i in range(1,101)],
+        "seconds":[{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
+        "minutes":[{"label":"Start Minute", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
+        "hours":[{"label":"Start Hour", "value":"None"}]+[{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)],
         "critical":{
             "start":{
                 "minutes":[],
@@ -244,17 +242,18 @@ def create_options():
     }
 
     if start_ts.hour != end_ts.hour:
-        options["critical"]["start"]["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,60)]
-        options["critical"]["end"]["minutes"] = [{"label":i,"value":i} for i in range(0,end_ts.minute+1)]
+        options["critical"]["start"]["minutes"] = [{"label":"Start Minute", "value":"None"}]+ [{"label":i,"value":i} for i in range(start_ts.minute,60)]
+        options["critical"]["end"]["minutes"] = [{"label":"Start Minute", "value":"None"}]+ [{"label":i,"value":i} for i in range(0,end_ts.minute+1)]
         if start_ts.minute != end_ts.minute:
-            options["critical"]["start"]["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,60)]
-            options["critical"]["end"]["seconds"] = [{"label":i,"value":i} for i in range(0,end_ts.second+1)]
+            options["critical"]["start"]["seconds"] = [{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(start_ts.second,60)]
+            options["critical"]["end"]["seconds"] = [{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(0,end_ts.second+1)]
         else:
-            options["critical"]["start"]["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,end_ts.second+1)]
+            options["critical"]["start"]["seconds"] = [{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(start_ts.second,end_ts.second+1)]
 
     else:
-        options["critical"]["start"]["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,end_ts.minute+1)]
+        options["critical"]["start"]["minutes"] = [{"label":"Start Minute", "value":"None"}]+[{"label":i,"value":i} for i in range(start_ts.minute,end_ts.minute+1)]
         # in this case, hour values are same, we do not need critical end, because we will always see that, hour of time will always be equal to hour of start time
+
     return options
 
 time_options = create_options()
@@ -271,32 +270,41 @@ app.layout = html.Div(children=[
                 dcc.Dropdown(
                     id="hour",
                     options=time_options["hours"],
-                    value = "Start Hour:",
+                    value = "None",
                 ),
                 ],
-                style={"display":"inline-block", "width":"33%"}
+                style={"display":"inline-block", "width":"25%"}
             ),
             html.Div([
                 dcc.Dropdown(
                     id="minute",
                     options=time_options["minutes"],
-                    value = "Start Minute:",
+                    value = "None",
                 ),
                 ],
-                style={"display":"inline-block", "width":"33%"}
+                style={"display":"inline-block", "width":"25%"}
             ),
             html.Div([
                 dcc.Dropdown(
                     id="second",
                     options=time_options["seconds"],
-                    value = "Start Seconds:",
+                    value = "None",
                 ),
                 ],
-                style={"display":"inline-block", "width":"33%"}
+                style={"display":"inline-block", "width":"25%"}
+            ),
+            html.Div([
+                dcc.Dropdown(
+                    id="duration",
+                    options=time_options["duration"],
+                    value = "None",
+                ),
+                ],
+                style={"display":"inline-block", "width":"25%"}
             ),
 
         ],
-        style= {"width":"30%", "display":"inline-block"}
+        style= {"width":"50%", "display":"inline-block"}
         ),
         html.Div([
             html.Div([
@@ -382,6 +390,26 @@ def update_second_options(hour,minute):
         return time_options["seconds"]
 
 @app.callback(
+    Output("duration", "options"),
+    [
+        Input("hour","value"),
+        Input("minute","value"),
+        Input("second","value"),
+    ]
+)
+def update_duration_options(hour,minute,second):
+    if not(type(hour) == int and type(minute)==int and type(second) ==int) :
+        return time_options["duration"]
+
+    requested_time = time(hour,minute,second)
+    distance_to_end = get_time_diff(requested_time, end_ts)
+    if distance_to_end+1 < 10:
+        max_duration = distance_to_end+1
+        return [{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i/10.0)+" sec","value":i/10.0} for i in range(1,(max_duration*10)+1)]
+    else:
+        return time_options["duration"]
+
+@app.callback(
     Output("graph", "figure"),
     [
         Input("graph_type","value"),
@@ -389,11 +417,12 @@ def update_second_options(hour,minute):
         Input("hour","value"),
         Input("minute","value"),
         Input("second","value"),
+        Input("duration","value")
     ]
 )
-def update_graph(graph_type,phase,hour,minute,second):
+def update_graph(graph_type,phase,hour,minute,second,duration):
 
-    if not(type(hour) == int and type(minute)==int and type(second) ==int):
+    if not(type(hour) == int and type(minute)==int and type(second) ==int and type(duration) == float) :
         return 0
     the_mode= "markers+lines"
     title = ""
@@ -416,7 +445,7 @@ def update_graph(graph_type,phase,hour,minute,second):
         file_index = blond.find_corresponding_file(requested_time, blond.time_stamps[data_field])
         time_diff = get_time_diff(requested_time , blond.time_stamps[data_field][file_index])
         data_index_shift = time_diff * sps
-        temp_data = blond.list_files()[data_field][file_index]["current"+str(phase)][data_index_shift:data_index_shift + int(sps*0.1)]
+        temp_data = blond.list_files()[data_field][file_index]["current"+str(phase)][data_index_shift:data_index_shift + int(sps*duration)]
         len_data = temp_data.shape[0]
         #print("length of "+data_field + "is:"+str(len_data))
         #print()
