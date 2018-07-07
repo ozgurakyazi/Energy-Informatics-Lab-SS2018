@@ -40,12 +40,9 @@ class Blond(object):
 
     def find_corresponding_file(self, the_time,all_timestamps):
         current_ts = all_timestamps[0]
-        print("the time:"+ str(the_time))
-        print("first time:"+str(current_ts))
         i=1
         try:
             while the_time >= current_ts:
-                print("temp time:"+str(current_ts))
                 current_ts = all_timestamps[i]
                 i+=1
         except: # in case requested time is in the last index of the list, we will have a error in [i]. so this except makes the index work.
@@ -74,7 +71,7 @@ class Blond(object):
             current_ts = timestamps[i]
             i+=1
         file_index = self.find_corresponding_file(start_ts,timestamps)
-        print("start file index:"+str(file_index))
+        #print("start file index:"+str(file_index))
         if file_index < 0: #no file found
             return [],[]
 
@@ -122,9 +119,7 @@ class Blond(object):
         for folder in glob.glob(path_to_medals):
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
-            print("now reading medal:"+medal_name)
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all, start_ts, end_ts,folder)
-            print("#############################")
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
 
@@ -232,26 +227,34 @@ def create_options():
     minutes = int(seconds/60)
     hours = int(minutes/60)
 
-    options={"seconds":[],"minutes":[],"hours":[], "critical":{"minutes":[],"seconds":[]} }
-    if seconds>59 or (start_ts.minute != end_ts.minute):
-        options["seconds"] = [{"label":i,"value":i} for i in range(60)]
-        if minutes>59 or (start_ts.minute != end_ts.minute):
-            options["minutes"] = [{"label":i,"value":i} for i in range(60)]
-            resid_min = minutes % 60
-            #options["critical"]["minutes"] = [{"label":i,"value":i} for i in range()]
+    options={
+        "seconds":[{"label":i,"value":i} for i in range(60)],
+        "minutes":[{"label":i,"value":i} for i in range(60)],
+        "hours":[{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)],
+        "critical":{
+            "start":{
+                "minutes":[],
+                "seconds":[]
+            },
+            "end":{
+                "minutes":[],
+                "seconds":[]
+            }
+        }
+    }
+
+    if start_ts.hour != end_ts.hour:
+        options["critical"]["start"]["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,60)]
+        options["critical"]["end"]["minutes"] = [{"label":i,"value":i} for i in range(0,end_ts.minute+1)]
+        if start_ts.minute != end_ts.minute:
+            options["critical"]["start"]["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,60)]
+            options["critical"]["end"]["seconds"] = [{"label":i,"value":i} for i in range(0,end_ts.second+1)]
         else:
-            options["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,start_ts.minute+minutes+1)]
-            options["critical"]["minutes"] = options["minutes"]
+            options["critical"]["start"]["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,end_ts.second+1)]
 
-        #options["hours"] = [{"label":i,"value":i} for i in range(start_ts.hour,start_ts.hour+hours+1)]
     else:
-        options["seconds"] = [{"label":i,"value":i} for i in range(start_ts.second,start_ts.second+seconds+1)]
-        options["critical"]["seconds"] = options["seconds"]
-        options["minutes"] = [{"label":start_ts.minute,"value":start_ts.minute} ]
-        options["critical"]["minutes"] = options["minutes"]
-        #options["hours"] = [{"label":start_ts.hour,"value":start_ts.hour} ]
-
-    options["hours"] = [{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)]
+        options["critical"]["start"]["minutes"] = [{"label":i,"value":i} for i in range(start_ts.minute,end_ts.minute+1)]
+        # in this case, hour values are same, we do not need critical end, because we will always see that, hour of time will always be equal to hour of start time
     return options
 
 time_options = create_options()
@@ -350,27 +353,33 @@ def update_phases_options(graph_type):
         return [{"label":"Phase:"+str(i), "value":i} for i in range(1,7)]
 
 
-# @app.callback(
-#     Output("graph", "figure"),
-#     [
-#         Input("graph_type","value"),
-#         Input("phases", "value"),
-#         Input("hour","value"),
-#         Input("minute","value"),
-#         Input("second","value"),
-#     ]
-# )
-# @app.callback(
-#     Output("minute", "options"),
-#     [
-#         Input("hour","value"),
-#     ]
-# )
-# def update_minute_options(hour):
-#     if hour == critical_times["hour"]:
-#
-#     else:
-#         return time_options
+@app.callback(
+    Output("minute","options"),
+    [
+        Input("hour","value"),
+    ]
+)
+def update_minute_options(hour):
+    if hour == start_ts.hour:
+        return time_options["critical"]["start"]["minutes"]
+    elif hour == end_ts.hour:
+        return time_options["critical"]["end"]["minutes"]
+    else:
+        return time_options["minutes"]
+@app.callback(
+    Output("second", "options"),
+    [
+        Input("hour","value"),
+        Input("minute","value"),
+    ]
+)
+def update_second_options(hour,minute):
+    if hour == start_ts.hour and minute == start_ts.minute:
+        return time_options["critical"]["start"]["seconds"]
+    elif hour == end_ts.hour and minute == end_ts.minute:
+        return time_options["critical"]["end"]["seconds"]
+    else:
+        return time_options["seconds"]
 
 @app.callback(
     Output("graph", "figure"),
@@ -409,8 +418,8 @@ def update_graph(graph_type,phase,hour,minute,second):
         data_index_shift = time_diff * sps
         temp_data = blond.list_files()[data_field][file_index]["current"+str(phase)][data_index_shift:data_index_shift + int(sps*0.1)]
         len_data = temp_data.shape[0]
-        print("length of "+data_field + "is:"+str(len_data))
-        print()
+        #print("length of "+data_field + "is:"+str(len_data))
+        #print()
         temp_graph = go.Scatter(
             x = np.linspace(1,15,len_data),
             y = temp_data[()],
@@ -419,7 +428,7 @@ def update_graph(graph_type,phase,hour,minute,second):
         )
         graph_list.append(temp_graph)
 
-    print("returning from update graph")
+    #print("returning from update graph")
     return go.Figure(
         data = graph_list,
         layout = go.Layout(
