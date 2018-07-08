@@ -3,8 +3,15 @@ import numpy as np
 import h5py
 import os, glob
 import re
-from datetime import datetime, date, time
+from datetime import datetime, date, time,timedelta
 from six import iteritems
+
+def get_time_diff(t1,t2):
+    t1_s = (t1.hour*60*60 + t1.minute*60 + t1.second)
+    t2_s = (t2.hour*60*60 + t2.minute*60 + t2.second)
+
+    delta_s = max([t1_s, t2_s]) - min([t1_s, t2_s])
+    return delta_s
 
 class Blond(object):
     """
@@ -13,13 +20,14 @@ class Blond(object):
     _SD_centered = []
     _SD_calibrated = []
 
-    def __init__(self, date, start_ts, end_ts,day_data = {}):
+    def __init__(self, date, start_ts, end_ts ,day_data = {}):
         self.date = date
         self._day_data = day_data
         self.time_stamps = {}
         self.start_ts=start_ts
         self.end_ts=end_ts
-
+        self._read_files()
+        self.sps = {"clear":50000, "medals":6400}
 
     def list_files(self):
         return self._day_data
@@ -63,16 +71,24 @@ class Blond(object):
         timestamps = list(map(lambda ts: datetime.strptime(ts, time_format ).time(), timestamps))
         timestamps.sort()
 
+        minute_per_file = 15 ## default is the minutes of medal files
+        if is_clear == 1: # if the read file is clear file
+            minute_per_file = 5 # minutes of the clear files
+        latest_possible_time = timestamps[-1]
+        ## get the latest possible time from the files.
+        latest_possible_time = (datetime.combine(date.today(), latest_possible_time) + timedelta(minutes = minute_per_file)).time()
+
         """ get the first file timestamp"""
         file_index = self.find_corresponding_file(self.start_ts,timestamps)
         #print("start file index:"+str(file_index))
-        if file_index < 0 or self.end_ts>timestamps[-1]: #no file found
-            print("The requested time frame is not found in the files of " + path_to_files)
+        if file_index < 0 or self.end_ts>latest_possible_time: #no file found
+            print("Error: The requested time frame is not found in the files of " + path_to_files)
+            raise
             return [],[]
 
         del timestamps[0:file_index] # remove the files before our start files
         """add first file to the rest"""
-        res_timestamps = [timestamps[0]] + [ts for ts in timestamps if self.start_ts <= ts <= self.end_ts]
+        res_timestamps = [timestamps[0]] + [ts for ts in timestamps if self.start_ts < ts <= self.end_ts]
         timestamps_filter= map(lambda ts: datetime.combine(self.date, ts).strftime(time_format), list(res_timestamps))
 
         res_list = []
@@ -91,7 +107,7 @@ class Blond(object):
         return data , res_timestamps
 
 
-    def read_files(self, start_ts, end_ts):
+    def _read_files(self):
         """ read_files() method scans the relevant folders and return a dictionary
             with the files relevant to the timeframe (start_ts, end_ts)
                 {'clear'  : [files],
@@ -120,14 +136,41 @@ class Blond(object):
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all,folder)
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
+    def read_data(self, device,signal,start_ts, end_ts):
+        if start_ts<self.start_ts or end_ts>self.end_ts: # if the requested times are not between possible latest and earliest times
+            print("No files are returned, since the requested time interval exceeds the possible times")
+            print("Please try initiating Blond object with a wider interval using start_ts and end_ts parameters")
+            return []
 
+        current_sps = self.sps["medals"]
+        if device == "clear":
+            current_sps = self.sps["clear"]
+        start_file_index = self.find_corresponding_file(start_ts,self.time_stamps[device])
+        start_diff = get_time_diff(start_ts, self.time_stamps[device][start_file_index]) # calculate how many seconds to ignore in the first file
+
+        res_timestamps_ind =[i for i,ts in enumerate(self.time_stamps[device]) if start_ts < ts <= end_ts] ##
+        end_file_index = res_timestamps_ind[-1]
+        del res_timestamps_ind[-1]
+        end_diff = get_time_diff(end_ts, self.time_stamps[device][end_file_index]) # calculate how many seconds to include in the last file
+
+        range_start =  start_diff*current_sps
+        range_end =  (end_diff+1)*current_sps # we include the last second. so times are inclusive
+        if start_file_index==end_file_index: ## if we will be reading from only 1 file
+            return self._day_data[device][start_file_index][signal][range_start:range_end]
+
+        result_data = self._day_data[device][start_file_index][signal][range_start:].tolist()
+        for temp_index in res_timestamps_ind:
+            result_data += self._day_data[device][temp_index][signal][:].tolist()
+
+
+        result_data += self._day_data[device][end_file_index][signal][0:range_end].tolist()
+
+        return np.array(result_data)
     """ center_inplace and calibrate inplace read file-by-file, do the corresponding operations and write back
         good thing: we can process much more files like that and not be bounded by memory since each file is less than 3 GB
         bad thing: we can't coerse from int to float
         We do not use them.
     """
-    def read_data(self, start_ts, end_ts):
-
     def center_inplace(self, device, signal):
         if device+signal in self._SD_centered:
             print("Signal '{}' for '{}' has been already centered.".format(signal, device))

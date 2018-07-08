@@ -20,10 +20,9 @@ def get_time_diff(t1,t2):
     delta_s = max([t1_s, t2_s]) - min([t1_s, t2_s])
     return delta_s
 ##########################
+"""Read MEDAL and CLEAR data """
 blond = Blond(date(2016,10,5),start_ts=time(0,50,0),end_ts=time(1,10,10))
 
-"""Read MEDAL and CLEAR data """
-blond.read_files(start_ts, end_ts)
 
 
 """Checking if files have been retrieved"""
