@@ -51,8 +51,8 @@ def create_options(device):
             "minutes":[{"label":"Start Minute", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
         }
         return options
-    start_ts = blond.max_time_of_start["time"] ## maximum start time
-    end_ts = blond.min_time_of_end["time"] ## minimum end time of the data. so these are boundaries
+    start_ts = blond.min_time_of_start["time"] ## maximum start time
+    end_ts = blond.max_time_of_end["time"] ## minimum end time of the data. so these are boundaries
     print(start_ts)
     print(end_ts)
     if device == "clear":
@@ -213,8 +213,8 @@ def update_minute_options(hour,graph_type):
         ### here find minimum of the end times and maximum of the start times
         ### among all medals. Because we are showing all the medals data together
         ### we cannot show data beyond these times.
-        max_of_start = blond.max_time_of_start
-        min_of_end = blond.min_time_of_end
+        max_of_start = blond.min_time_of_start
+        min_of_end = blond.max_time_of_end
         device = "medals"
 
     if hour == max_of_start["time"].hour:
@@ -239,8 +239,8 @@ def update_second_options(hour,minute,graph_type):
         ### here find minimum of the end times and maximum of the start times
         ### among all medals. Because we are showing all the medals data together
         ### we cannot show data beyond these times.
-        start_ts = blond.max_time_of_start["time"]
-        end_ts = blond.min_time_of_end["time"]
+        start_ts = blond.min_time_of_start["time"]
+        end_ts = blond.max_time_of_end["time"]
         device = "medals"
 
     if hour == start_ts.hour and minute == start_ts.minute:
@@ -266,7 +266,7 @@ def update_duration_options(hour,minute,second,graph_type):
     end_ts =blond.time_limits["clear"]["latest"]
     device = "clear"
     if graph_type == 1: ## individual signals
-        end_ts = blond.min_time_of_end["time"]
+        end_ts = blond.max_time_of_end["time"]
 
     requested_time = time(hour,minute,second)
     distance_to_end = get_time_diff(requested_time, end_ts)
@@ -308,7 +308,7 @@ def update_graph(graph_type,phase,hour,minute,second,duration):
 
 
     requested_time = time(hour,minute,second)
-    end_time = increment_time(requested_time, seconds=duration-1)
+    end_time = increment_time(requested_time, seconds=duration)
     graph_list = []
     for device in devices:
         temp_data = blond.read_data( device=device,signal="current"+str(phase),start_ts=requested_time, end_ts=end_time)

@@ -44,26 +44,26 @@ class Blond(object):
 
     def _determine_limits(self):
         """
-        This function determines minimum of the end times and maximum of the start times
+        This function determines maximum of the end times and minimum of the start times
         among all medals. Because in dashboard application,
         we show all the medal data together, we have to decide on the strict
-        bounds on the time. For example, after 23:30:30 medal-2 does not contain
-        any data but, medal-1 contains. We can only the data until 23:30:30.
+        bounds on the time. For example, after 23:30:30 none of the medals contain
+        any data. We can only show the data until 23:30:30.
         """
-        max_of_start = {"time":time(0,0,0),"device":"None"}
-        min_of_end = {"time":time(23,59,59),"device":"None"}
+        min_of_start = {"time":time(23,59,59),"device":"None"}
+        max_of_end = {"time":time(0,0,0),"device":"None"}
         for temp_device in self.time_limits.keys():
             if temp_device == "clear": ## here we are determining time limits for the medals. so clear is excluded
                 continue
-            if max_of_start["time"]<self.time_limits[temp_device]["earliest"]:
-                max_of_start["time"] = self.time_limits[temp_device]["earliest"]
-                max_of_start["device"]=temp_device
-            if min_of_end["time"]>self.time_limits[temp_device]["latest"]:
-                min_of_end["time"] = self.time_limits[temp_device]["latest"]
-                min_of_end["device"]=temp_device
+            if min_of_start["time"]>self.time_limits[temp_device]["earliest"]:
+                min_of_start["time"] = self.time_limits[temp_device]["earliest"]
+                min_of_start["device"]=temp_device
+            if max_of_end["time"]<self.time_limits[temp_device]["latest"]:
+                max_of_end["time"] = self.time_limits[temp_device]["latest"]
+                max_of_end["device"]=temp_device
 
-        self.max_time_of_start = max_of_start
-        self.min_time_of_end = min_of_end
+        self.min_time_of_start = min_of_start
+        self.max_time_of_end = max_of_end
     @staticmethod
     def _regex_map(pattern, strings_list):
 
@@ -139,7 +139,7 @@ class Blond(object):
 
         latest_possible_time = self.time_stamps["clear"][-1]
         ## get the latest possible time from the files.
-        latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["clear"])
+        latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["clear"],seconds=-1)
         self.time_limits["clear"] = {"latest":0,"earliest":0}
         self.time_limits["clear"]["latest"] = latest_possible_time
         self.time_limits["clear"]["earliest"] = self.time_stamps["clear"][0]
@@ -156,28 +156,28 @@ class Blond(object):
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all,folder)
             latest_possible_time = self.time_stamps[medal_name][-1]
             ## get the latest possible time from the files.
-            latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["medals"])
-            print("latest possible.")
-            print(latest_possible_time)
+            latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["medals"],seconds=-1)
+            # print("latest possible.")
+            # print(latest_possible_time)
             self.time_limits[medal_name] = {"latest":0,"earliest":0}
             self.time_limits[medal_name]["earliest"]= self.time_stamps[medal_name][0]
             self.time_limits[medal_name]["latest"] = latest_possible_time
-            print(medal_name)
-            print(self.time_limits[medal_name])
+            # print(medal_name)
+            # print(self.time_limits[medal_name])
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
     def read_data(self, device,signal,start_ts, end_ts):
-        print("device:"+device)
-        print("start:"+str(start_ts))
-        print("end:"+str(end_ts))
+        # print("device:"+device)
+        # print("start:"+str(start_ts))
+        # print("end:"+str(end_ts))
+        #
+        # print("limit start:"+str(self.time_limits[device]["earliest"]))
+        # print("limit end:"+str(self.time_limits[device]["latest"]))
 
-        print("limit start:"+str(self.time_limits[device]["earliest"]))
-        print("limit end:"+str(self.time_limits[device]["latest"]))
-
-        if start_ts<self.time_limits[device]["earliest"] or end_ts>self.time_limits[device]["latest"]: # if the requested times are not between possible latest and earliest times
+        if start_ts<self.time_limits[device]["earliest"] or increment_time(end_ts,seconds=-1)>self.time_limits[device]["latest"]: # if the requested times are not between possible latest and earliest times
             print("No data is returned, since the requested time interval exceeds the possible times in your "+ device + " data")
             print("Please try provide more data under "+ device)
-            return []
+            return np.array([])
 
         current_sps = self.sps["medals"]
         if device == "clear":
@@ -194,7 +194,7 @@ class Blond(object):
 
         end_diff = get_time_diff(end_ts, self.time_stamps[device][end_file_index]) # calculate how many seconds to include in the last file
         range_start =  start_diff*current_sps
-        range_end =  (end_diff+1)*current_sps # we include the last second. so times are inclusive
+        range_end =  (end_diff)*current_sps
         if start_file_index==end_file_index: ## if we will be reading from only 1 file
             return self._day_data[device][start_file_index][signal][range_start:range_end]
 
