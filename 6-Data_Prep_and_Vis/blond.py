@@ -7,6 +7,9 @@ from datetime import datetime, date, time,timedelta
 from six import iteritems
 
 def get_time_diff(t1,t2):
+    """
+    Here we take time difference of 2 datetime.time objects and return it as seconds.
+    """
     t1_s = (t1.hour*60*60 + t1.minute*60 + t1.second)
     t2_s = (t2.hour*60*60 + t2.minute*60 + t2.second)
 
@@ -14,6 +17,11 @@ def get_time_diff(t1,t2):
     return delta_s
 
 def increment_time(t1,minutes=0,seconds=0):
+    """
+    Input of t1 datetime.time object is incremented 'minutes' and 'seconds'
+    As a special case, if the final time does belong to the next day, then we return time as 23:59:59
+    since in this application, we are only working on one specific day's data.
+    """
     prev_date = datetime.combine(date.today(), t1)
     new_date=  prev_date + timedelta(minutes = minutes,seconds=seconds)
 
@@ -23,7 +31,8 @@ def increment_time(t1,minutes=0,seconds=0):
     return new_date.time()
 class Blond(object):
     """
-        class blond: attributes: date, list of files
+        This class contains all the input output operations with the hdf5 files, residing under
+        "./data/" folder.
     """
     _SD_centered = []
     _SD_calibrated = []
@@ -40,8 +49,10 @@ class Blond(object):
         self._get_paths()
         self._determine_limits()
 
+    ## list file names for each device
     def list_files(self):
         return self._day_data
+    # get structure of the data, like signals for each device.
     def get_data_structure(self):
         return self.data_structure
 
@@ -79,6 +90,11 @@ class Blond(object):
 
 
     def find_corresponding_file(self, the_time,all_timestamps):
+        """
+        For a given datetime.time object called the_time, we search for the belonging timestamp from the all_timestamps
+        Actually, this all_timestamps are the timestamps from a device, and when we are looking for a time value in the
+        files of the device, we are using this function.
+        """
         current_ts = all_timestamps[0]
         i=1
         try:
@@ -89,15 +105,16 @@ class Blond(object):
             i+=1
 
         return i-2
-    def _get_device_paths(self, files,path_to_device,is_clear = 0):
-        """This method gets file in the folder w.r.t. to the timeframe start_ts - end_ts
+    def _extract_timestamps(self, files,is_clear = 0):
+        """
+        This method extracts timestamps from a given Blond dataset's hdf5 file names.
 
-            How it works:
-            1. gets a list of files in the folder
-            2. extracts timestamps with _regex_map() method and converts it to datetime.time()
-            3. fetch the first file which fits the timeframe
-            4. add the remaining files by the filter start_timestamp <= file_timestamp <= end_timestamp
-
+        How it works:
+        1. gets a list of files in the folder
+        2. extracts timestamps with _regex_map() method and converts it to datetime.time()
+        3. sorts the timestamps
+        4. sorts file name lists, to make the indexes of timestamps and file names comparable.
+        5. returns both reordered file names and timestamps
         """
 
         pattern = r'(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})'
@@ -114,44 +131,34 @@ class Blond(object):
         for ts in timestamps_filter: ## we are doing this step, because we need the file paths to be in the same order with timestamp
             res_list += [f for f in files if ts in f]
 
-        #data = []
-        #for a_file in res_list:
-        #    try:
-        #        data.append(h5py.File(path_to_device + a_file,'r+'))
-        #    except:
-        #        temp_file = h5py.File(path_to_device + a_file, 'r')
-        #        temp_file.close()
-        #        data.append(h5py.File(path_to_device + a_file,'r+'))
         return res_list , timestamps
 
 
     def _get_paths(self):
-        """ read_files() method scans the relevant folders and return a dictionary
-            with the files relevant to the timeframe (start_ts, end_ts)
-                {'clear'  : [files],
-                 'medal-1': [files],
-                 'medal-2': [files],
-                    ...
-                }
+        """
+        _get_paths() method scans the relevant folders and saves the relevant information into the class variables.
         """
 
         """READING CLEAR UNIT"""
         path_to_clear = self.path_to_files + 'clear/'
         files_all = next(os.walk(path_to_clear))[2]
-        self._day_data['clear'], self.time_stamps["clear"] = self._get_device_paths(files_all,path_to_clear,is_clear=1)
-
+        ##### save clear file names and filestamps#####
+        self._day_data['clear'], self.time_stamps["clear"] = self._extract_timestamps(files_all,is_clear=1)
+        ###############################################
         ##### extract data structure from one of the clear files
         temp_data = h5py.File(self.path_to_files+"/clear/" + self._day_data["clear"][0], 'r')
-        self.data_structure["clear"] = list(temp_data.keys())
+        self.data_structure["clear"] = list(temp_data.keys()) ## signal names are saved here.
         temp_data.close()
         #########################################################
 
+        ##### determine time limits for the clear device ########################
         latest_possible_time = self.time_stamps["clear"][-1]
         ## get the latest possible time from the files.
-        latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["clear"],seconds=-1)
+        latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["clear"],seconds=-1) # minus 1 second, because last second of the file is exclusive already.
         self.time_limits["clear"] = {"latest":0,"earliest":0}
         self.time_limits["clear"]["latest"] = latest_possible_time
         self.time_limits["clear"]["earliest"] = self.time_stamps["clear"][0]
+        #########################################################################
 
 
         """READING MEDAL UNITS"""
@@ -163,28 +170,29 @@ class Blond(object):
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
 
-            self._day_data[medal_name], self.time_stamps[medal_name] = self._get_device_paths(files_all,folder)
+            ##### save clear file names and filestamps from the current medal device#####
+            self._day_data[medal_name], self.time_stamps[medal_name] = self._extract_timestamps(files_all)
+            ###############################################
 
-            ## extract the data structure from one of the medal files.
+            ## extract the data structure from one of the medal files.###################
             temp_data = h5py.File(self.path_to_files+"/"+medal_name+"/" + self._day_data[medal_name][0], 'r')
             self.data_structure[medal_name] = list(temp_data.keys())
             temp_data.close()
             #########################################################
 
+            ##### determine time limits for the clear device ########################
             latest_possible_time = self.time_stamps[medal_name][-1]
             ## get the latest possible time from the files.
             latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["medals"],seconds=-1)
-            # print("latest possible.")
-            # print(latest_possible_time)
             self.time_limits[medal_name] = {"latest":0,"earliest":0}
             self.time_limits[medal_name]["earliest"]= self.time_stamps[medal_name][0]
             self.time_limits[medal_name]["latest"] = latest_possible_time
-            # print(medal_name)
-            # print(self.time_limits[medal_name])
-            #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
 
     def _get_data_from_file(self,device,signal,file_index,calibrate=True ):
+        """
+        This is the function to read the data from the 'device' with the signal 'signal'
+        """
         file = self._day_data[device][file_index]
         all_data=h5py.File(self.path_to_files+"/"+device+"/" + file, 'r')
         result_data = 0
