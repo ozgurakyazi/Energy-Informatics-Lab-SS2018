@@ -189,7 +189,7 @@ class Blond(object):
             self.time_limits[medal_name]["latest"] = latest_possible_time
 
 
-    def _get_data_from_file(self,device,signal,file_index,calibrate=True ):
+    def _get_data_from_file(self,device,signal,file_index,calibrate=True,center=True ):
         """
         This is the function to read the data from the 'device' with the signal 'signal'
         whose file index is 'file_index'. Indexing the files work without any problem since we save them
@@ -198,19 +198,19 @@ class Blond(object):
         file = self._day_data[device][file_index]## get the file name
         all_data=h5py.File(self.path_to_files+"/"+device+"/" + file, 'r')## open the file description
         result_data = 0
+        factor = 1
         if calibrate:
-            DC_offset = 0
-            if device != "clear": # no offset for clear
-                DC_offset = all_data[signal].attrs['removed_offset']
-
             factor = all_data[signal].attrs['calibration_factor']
-            result_data = ((all_data[signal][:] + DC_offset) * factor).astype("<f4")
-        else:
-            result_data = all_data[signal][:]
+
+        DC_offset = 0
+        if device != "clear" and center: # no offset for clear
+            DC_offset = all_data[signal].attrs['removed_offset']
+
+        result_data = ((all_data[signal][:] + DC_offset) * factor).astype("<f4")
         all_data.close()
         return result_data
 
-    def read_data(self, device,signal,start_ts, end_ts,calibrate=True):
+    def read_data(self, device,signal,start_ts, end_ts,calibrate=True,center=True):
 
         if start_ts<self.time_limits[device]["earliest"] or increment_time(end_ts,seconds=-1)>self.time_limits[device]["latest"]: # if the requested times are not between possible latest and earliest times
             print("No data is returned, since the requested time interval exceeds the possible times in your "+ device + " data")
@@ -235,14 +235,14 @@ class Blond(object):
         range_end =  (end_diff)*current_sps
         if start_file_index==end_file_index: ## if we will be reading from only 1 file
             file_name = self._day_data[device][start_file_index]
-            the_data = self._get_data_from_file(device,signal,start_file_index,calibrate)
+            the_data = self._get_data_from_file(device,signal,start_file_index,calibrate,center)
             result_data = the_data[range_start:range_end]
             return result_data
 
-        result_data = self._get_data_from_file(device,signal,start_file_index)[range_start:].tolist()
+        result_data = self._get_data_from_file(device,signal,start_file_index,calibrate,center)[range_start:].tolist()
         for temp_index in res_timestamps_ind:
-            result_data += self._get_data_from_file(device,signal,temp_index,calibrate)[:].tolist()
+            result_data += self._get_data_from_file(device,signal,temp_index,calibrate,center)[:].tolist()
 
 
-        result_data += self._get_data_from_file(device,signal,end_file_index)[0:range_end].tolist()
+        result_data += self._get_data_from_file(device,signal,end_file_index,calibrate,center)[0:range_end].tolist()
         return np.array(result_data)
