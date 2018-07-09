@@ -14,9 +14,6 @@ from blond import Blond, get_time_diff,increment_time
 
 """Read MEDAL and CLEAR data """
 blond = Blond(date(2016,10,5))
-
-"""calibrate and center the signals"""
-blond.center_and_calibrate_all()
 ##########################
 
 def create_options(device):
@@ -292,7 +289,7 @@ def update_graph(graph_type,phase,hour,minute,second,duration):
         #print("length of "+device + "is:"+str(len_data))
         #print()
         temp_graph = go.Scatter(
-            x = np.linspace(1,15,len_data),
+            x = np.linspace(0,duration,len_data),
             y = temp_data[()],
             mode=the_mode,
             name=device.title()
@@ -317,4 +314,4 @@ def update_graph(graph_type,phase,hour,minute,second,duration):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=False,port=8051)
+    app.run_server(debug=False,port=8050)

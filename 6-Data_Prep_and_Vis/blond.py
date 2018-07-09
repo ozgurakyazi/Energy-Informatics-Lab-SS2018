@@ -29,17 +29,21 @@ class Blond(object):
     _SD_calibrated = []
 
     def __init__(self, date,day_data = {}):
+        self.path_to_files = './data/'
+        self.data_structure = {}
         self.date = date
         self._day_data = day_data
         self.time_stamps = {}
         self.sps = {"clear":50000, "medals":6400}
         self.time_limits = {}
         self.minute_per_file = {"clear":5,"medals":15}
-        self._read_files()
+        self._get_paths()
         self._determine_limits()
 
     def list_files(self):
         return self._day_data
+    def get_data_structure(self):
+        return self.data_structure
 
 
     def _determine_limits(self):
@@ -85,7 +89,7 @@ class Blond(object):
             i+=1
 
         return i-2
-    def _read_files_from_folder(self, files,path_to_files,is_clear = 0):
+    def _get_device_paths(self, files,path_to_device,is_clear = 0):
         """This method gets file in the folder w.r.t. to the timeframe start_ts - end_ts
 
             How it works:
@@ -107,21 +111,21 @@ class Blond(object):
         timestamps_filter= map(lambda ts: datetime.combine(self.date, ts).strftime(time_format), list(timestamps))
 
         res_list = []
-        for ts in timestamps_filter:
+        for ts in timestamps_filter: ## we are doing this step, because we need the file paths to be in the same order with timestamp
             res_list += [f for f in files if ts in f]
 
-        data = []
-        for a_file in res_list:
-            try:
-                data.append(h5py.File(path_to_files + a_file,'r+'))
-            except:
-                temp_file = h5py.File(path_to_files + a_file, 'r')
-                temp_file.close()
-                data.append(h5py.File(path_to_files + a_file,'r+'))
-        return data , timestamps
+        #data = []
+        #for a_file in res_list:
+        #    try:
+        #        data.append(h5py.File(path_to_device + a_file,'r+'))
+        #    except:
+        #        temp_file = h5py.File(path_to_device + a_file, 'r')
+        #        temp_file.close()
+        #        data.append(h5py.File(path_to_device + a_file,'r+'))
+        return res_list , timestamps
 
 
-    def _read_files(self):
+    def _get_paths(self):
         """ read_files() method scans the relevant folders and return a dictionary
             with the files relevant to the timeframe (start_ts, end_ts)
                 {'clear'  : [files],
@@ -132,10 +136,15 @@ class Blond(object):
         """
 
         """READING CLEAR UNIT"""
-        path_to_clear = './data/clear/'
+        path_to_clear = self.path_to_files + 'clear/'
         files_all = next(os.walk(path_to_clear))[2]
-        self._day_data['clear'], self.time_stamps["clear"] = self._read_files_from_folder(files_all,path_to_clear,is_clear=1)
-        #self._day_data['clear'] = [h5py.File(path_to_clear + file_name,'r+') for file_name in target_files]
+        self._day_data['clear'], self.time_stamps["clear"] = self._get_device_paths(files_all,path_to_clear,is_clear=1)
+
+        ##### extract data structure from one of the clear files
+        temp_data = h5py.File(self.path_to_files+"/clear/" + self._day_data["clear"][0], 'r')
+        self.data_structure["clear"] = list(temp_data.keys())
+        temp_data.close()
+        #########################################################
 
         latest_possible_time = self.time_stamps["clear"][-1]
         ## get the latest possible time from the files.
@@ -143,6 +152,7 @@ class Blond(object):
         self.time_limits["clear"] = {"latest":0,"earliest":0}
         self.time_limits["clear"]["latest"] = latest_possible_time
         self.time_limits["clear"]["earliest"] = self.time_stamps["clear"][0]
+
 
         """READING MEDAL UNITS"""
 
@@ -153,7 +163,14 @@ class Blond(object):
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
 
-            self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all,folder)
+            self._day_data[medal_name], self.time_stamps[medal_name] = self._get_device_paths(files_all,folder)
+
+            ## extract the data structure from one of the medal files.
+            temp_data = h5py.File(self.path_to_files+"/"+medal_name+"/" + self._day_data[medal_name][0], 'r')
+            self.data_structure[medal_name] = list(temp_data.keys())
+            temp_data.close()
+            #########################################################
+
             latest_possible_time = self.time_stamps[medal_name][-1]
             ## get the latest possible time from the files.
             latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["medals"],seconds=-1)
@@ -166,13 +183,24 @@ class Blond(object):
             # print(self.time_limits[medal_name])
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
-    def read_data(self, device,signal,start_ts, end_ts):
-        # print("device:"+device)
-        # print("start:"+str(start_ts))
-        # print("end:"+str(end_ts))
-        #
-        # print("limit start:"+str(self.time_limits[device]["earliest"]))
-        # print("limit end:"+str(self.time_limits[device]["latest"]))
+
+    def _get_data_from_file(self,device,signal,file_index,calibrate=True ):
+        file = self._day_data[device][file_index]
+        all_data=h5py.File(self.path_to_files+"/"+device+"/" + file, 'r')
+        result_data = 0
+        if calibrate:
+            DC_offset = 0
+            if device != "clear": # no offset for clear
+                DC_offset = all_data[signal].attrs['removed_offset']
+
+            factor = all_data[signal].attrs['calibration_factor']
+            result_data = ((all_data[signal][:] + DC_offset) * factor).astype("<f4")
+        else:
+            result_data = all_data[signal][:]
+        all_data.close()
+        return result_data
+
+    def read_data(self, device,signal,start_ts, end_ts,calibrate=True):
 
         if start_ts<self.time_limits[device]["earliest"] or increment_time(end_ts,seconds=-1)>self.time_limits[device]["latest"]: # if the requested times are not between possible latest and earliest times
             print("No data is returned, since the requested time interval exceeds the possible times in your "+ device + " data")
@@ -196,77 +224,15 @@ class Blond(object):
         range_start =  start_diff*current_sps
         range_end =  (end_diff)*current_sps
         if start_file_index==end_file_index: ## if we will be reading from only 1 file
-            return self._day_data[device][start_file_index][signal][range_start:range_end]
+            file_name = self._day_data[device][start_file_index]
+            the_data = self._get_data_from_file(device,signal,start_file_index,calibrate)
+            result_data = the_data[range_start:range_end]
+            return result_data
 
-        result_data = self._day_data[device][start_file_index][signal][range_start:].tolist()
+        result_data = self._get_data_from_file(device,signal,start_file_index)[range_start:].tolist()
         for temp_index in res_timestamps_ind:
-            result_data += self._day_data[device][temp_index][signal][:].tolist()
+            result_data += self._get_data_from_file(device,signal,temp_index,calibrate)[:].tolist()
 
 
-        result_data += self._day_data[device][end_file_index][signal][0:range_end].tolist()
+        result_data += self._get_data_from_file(device,signal,end_file_index)[0:range_end].tolist()
         return np.array(result_data)
-    """ center_inplace and calibrate inplace read file-by-file, do the corresponding operations and write back
-        good thing: we can process much more files like that and not be bounded by memory since each file is less than 3 GB
-        bad thing: we can't coerse from int to float
-        We do not use them.
-    """
-    def center_inplace(self, device, signal):
-        if device+signal in self._SD_centered:
-            print("Signal '{}' for '{}' has been already centered.".format(signal, device))
-            return
-        else:
-            self._SD_centered.append(device+signal)
-            data_list = self._day_data[device]
-            if device != 'clear': #NO OFFSET FOR CLEAR DEVICE
-                for i, data_file in enumerate(data_list):
-                    DC_offset = data_file[signal].attrs['removed_offset']
-                    #print(DC_offset)
-                    data_file[signal][:] = data_file[signal][:] + DC_offset
-                    self._day_data[device][i] = data_file
-
-
-    def calibrate_inplace(self, device, signal):
-        if device+signal in self._SD_calibrated:
-            print("Signal '{}' for '{}' has been already calibrated.".format(signal, device))
-            return
-        else:
-            self._SD_calibrated.append(device+signal)
-            data_list = self._day_data[device]
-            for i, data_file in enumerate(data_list):
-                factor = data_file[signal].attrs['calibration_factor']
-                #print(factor)
-                data_file[signal][:] = (data_file[signal][:] * factor)
-                self._day_data[device][i] = data_file
-
-
-    def dict_read_signal(self, device, signal):
-        """reads the signal of the corresponding device and writes it to the dictionary"""
-        files = self._day_data[device]
-        return {'signal': device+'_'+signal,
-                'attributes': list(map(lambda f: {'DC_offset': 0 if device == 'clear' else f[signal].attrs['removed_offset'],
-                              'calibration_factor': f[signal].attrs['calibration_factor'],
-                              'values': f[signal][:]
-                             }, files))
-
-               }
-
-    def center_and_calibrate(self, dict_signal):
-        """reads the dictionary from the dict_read_signal() method, then centers and calibrates it"""
-        data_calibrated = {}
-        signal_data = dict_signal['attributes']
-        for data in signal_data:
-            data_calibrated[dict_signal['signal']] = ((data['values'] + data['DC_offset']) * data['calibration_factor']).astype("<f4")
-
-        return data_calibrated
-
-    def center_and_calibrate_all(self):
-        for medal_name in self.list_files().keys():
-            for i in range(1,7):
-                if medal_name == "clear": ## in clear, we only of current1..3,
-                    if i==4:
-                        break
-                print("Centering and Calibrating: "+ medal_name + " current"+str(i) )
-                """Raw signal with offset and calibration factor attributes"""
-                dict_signal = self.dict_read_signal(medal_name, "current"+str(i))
-                """calibrated signal for clear"""
-                self.center_and_calibrate(dict_signal)
