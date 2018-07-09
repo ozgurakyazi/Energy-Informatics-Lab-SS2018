@@ -283,14 +283,15 @@ def update_graph(graph_type,phase,hour,minute,second,duration):
     requested_time = time(hour,minute,second)
     end_time = increment_time(requested_time, seconds=duration)
     graph_list = []
+    print("current"+str(phase) +" " +str(requested_time) + " " + str(end_time))
     for device in devices:
         temp_data = blond.read_data( device=device,signal="current"+str(phase),start_ts=requested_time, end_ts=end_time)
         len_data = temp_data.shape[0]
-        #print("length of "+device + "is:"+str(len_data))
-        #print()
+        print("length of "+device + "is:"+str(len_data))
+        print(temp_data[0:10])
         temp_graph = go.Scatter(
             x = np.linspace(0,duration,len_data),
-            y = temp_data[()],
+            y = temp_data,
             mode=the_mode,
             name=device.title()
         )
