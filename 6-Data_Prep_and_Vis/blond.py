@@ -192,9 +192,11 @@ class Blond(object):
     def _get_data_from_file(self,device,signal,file_index,calibrate=True ):
         """
         This is the function to read the data from the 'device' with the signal 'signal'
+        whose file index is 'file_index'. Indexing the files work without any problem since we save them
+        with the exactly same order of time stamps.
         """
-        file = self._day_data[device][file_index]
-        all_data=h5py.File(self.path_to_files+"/"+device+"/" + file, 'r')
+        file = self._day_data[device][file_index]## get the file name
+        all_data=h5py.File(self.path_to_files+"/"+device+"/" + file, 'r')## open the file description
         result_data = 0
         if calibrate:
             DC_offset = 0
