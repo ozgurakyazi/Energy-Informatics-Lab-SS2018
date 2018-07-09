@@ -10,20 +10,10 @@ import re
 from datetime import datetime, date, time
 from six import iteritems
 
-from blond import Blond
+from blond import Blond, get_time_diff,increment_time
 
-##########################
-def get_time_diff(t1,t2):
-    t1_s = (t1.hour*60*60 + t1.minute*60 + t1.second)
-    t2_s = (t2.hour*60*60 + t2.minute*60 + t2.second)
-
-    delta_s = max([t1_s, t2_s]) - min([t1_s, t2_s])
-    return delta_s
-##########################
 """Read MEDAL and CLEAR data """
-blond = Blond(date(2016,10,5),start_ts=time(0,50,0),end_ts=time(1,10,10))
-
-
+blond = Blond(date(2016,10,5))
 
 """Checking if files have been retrieved"""
 print("list the files:")
@@ -53,15 +43,22 @@ print(dict_signal)
 blond.center_and_calibrate(dict_signal)
 ##########################
 
-def create_options():
-    seconds = get_time_diff(start_ts,end_ts)
-    minutes = int(seconds/60)
-    hours = int(minutes/60)
-
+def create_options(device):
+    if device == "default":
+        options={
+            "duration":[{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i)+" sec","value":i} for i in range(1,10 +1)],
+            "seconds":[{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
+            "minutes":[{"label":"Start Minute", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
+        }
+        return options
+    start_ts = blond.max_time_of_start["time"] ## maximum start time
+    end_ts = blond.min_time_of_end["time"] ## minimum end time of the data. so these are boundaries
+    print(start_ts)
+    print(end_ts)
+    if device == "clear":
+        start_ts = blond.time_limits["clear"]["earliest"]
+        end_ts = blond.time_limits["clear"]["latest"]
     options={
-        "duration":[{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i/10.0)+" sec","value":i/10.0} for i in range(1,101)],
-        "seconds":[{"label":"Start Second", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
-        "minutes":[{"label":"Start Minute", "value":"None"}]+[{"label":i,"value":i} for i in range(60)],
         "hours":[{"label":"Start Hour", "value":"None"}]+[{"label":i,"value":i} for i in range(start_ts.hour,end_ts.hour+1)],
         "critical":{
             "start":{
@@ -90,7 +87,8 @@ def create_options():
 
     return options
 
-time_options = create_options()
+time_options ={"default": create_options("default"), "clear":create_options("clear"),"medals":create_options("medals")}
+
 ##########################
 
 app = dash.Dash()
@@ -103,7 +101,7 @@ app.layout = html.Div(children=[
             html.Div([
                 dcc.Dropdown(
                     id="hour",
-                    options=time_options["hours"],
+                    options=time_options["clear"]["hours"],
                     value = "None",
                 ),
                 ],
@@ -112,7 +110,7 @@ app.layout = html.Div(children=[
             html.Div([
                 dcc.Dropdown(
                     id="minute",
-                    options=time_options["minutes"],
+                    options=time_options["default"]["minutes"],
                     value = "None",
                 ),
                 ],
@@ -121,7 +119,7 @@ app.layout = html.Div(children=[
             html.Div([
                 dcc.Dropdown(
                     id="second",
-                    options=time_options["seconds"],
+                    options=time_options["default"]["seconds"],
                     value = "None",
                 ),
                 ],
@@ -130,7 +128,7 @@ app.layout = html.Div(children=[
             html.Div([
                 dcc.Dropdown(
                     id="duration",
-                    options=time_options["duration"],
+                    options=time_options["default"]["duration"],
                     value = "None",
                 ),
                 ],
@@ -162,14 +160,6 @@ app.layout = html.Div(children=[
         )
         ],
     ),
-    # dcc.RangeSlider(
-    #     id="timerange",
-    #     count=1,
-    #     min=-5,
-    #     max=10,
-    #     step=0.5,
-    #     value=[-3, 7]
-    # ),
     dcc.Graph(
         id='graph',
     )
@@ -196,32 +186,69 @@ def update_phases_options(graph_type):
 
 
 @app.callback(
+    Output("hour","options"),
+    [
+        Input("graph_type","value"),
+    ]
+)
+def update_hour_options(graph_type):
+
+    if graph_type == 1:
+        return time_options["medals"]["hours"]
+
+    return time_options["clear"]["hours"]
+@app.callback(
     Output("minute","options"),
     [
         Input("hour","value"),
+        Input("graph_type","value"),
     ]
 )
-def update_minute_options(hour):
-    if hour == start_ts.hour:
-        return time_options["critical"]["start"]["minutes"]
-    elif hour == end_ts.hour:
-        return time_options["critical"]["end"]["minutes"]
+def update_minute_options(hour,graph_type):
+
+    max_of_start = {"time":blond.time_limits["clear"]["earliest"],"device":"clear"}
+    min_of_end = {"time":blond.time_limits["clear"]["latest"],"device":"clear"}
+    device = "clear"
+    if graph_type == 1: ## individual signals
+        ### here find minimum of the end times and maximum of the start times
+        ### among all medals. Because we are showing all the medals data together
+        ### we cannot show data beyond these times.
+        max_of_start = blond.max_time_of_start
+        min_of_end = blond.min_time_of_end
+        device = "medals"
+
+    if hour == max_of_start["time"].hour:
+        return time_options[device]["critical"]["start"]["minutes"]
+    elif hour == min_of_end["time"].hour:
+        return time_options[device]["critical"]["end"]["minutes"]
     else:
-        return time_options["minutes"]
+        return time_options["default"]["minutes"]
 @app.callback(
     Output("second", "options"),
     [
         Input("hour","value"),
         Input("minute","value"),
+        Input("graph_type","value"),
     ]
 )
-def update_second_options(hour,minute):
+def update_second_options(hour,minute,graph_type):
+    start_ts = blond.time_limits["clear"]["earliest"]
+    end_ts =blond.time_limits["clear"]["latest"]
+    device = "clear"
+    if graph_type == 1: ## individual signals
+        ### here find minimum of the end times and maximum of the start times
+        ### among all medals. Because we are showing all the medals data together
+        ### we cannot show data beyond these times.
+        start_ts = blond.max_time_of_start["time"]
+        end_ts = blond.min_time_of_end["time"]
+        device = "medals"
+
     if hour == start_ts.hour and minute == start_ts.minute:
-        return time_options["critical"]["start"]["seconds"]
+        return time_options[device]["critical"]["start"]["seconds"]
     elif hour == end_ts.hour and minute == end_ts.minute:
-        return time_options["critical"]["end"]["seconds"]
+        return time_options[device]["critical"]["end"]["seconds"]
     else:
-        return time_options["seconds"]
+        return time_options["default"]["seconds"]
 
 @app.callback(
     Output("duration", "options"),
@@ -229,19 +256,25 @@ def update_second_options(hour,minute):
         Input("hour","value"),
         Input("minute","value"),
         Input("second","value"),
+        Input("graph_type","value"),
     ]
 )
-def update_duration_options(hour,minute,second):
+def update_duration_options(hour,minute,second,graph_type):
     if not(type(hour) == int and type(minute)==int and type(second) ==int) :
-        return time_options["duration"]
+        return time_options["default"]["duration"]
+
+    end_ts =blond.time_limits["clear"]["latest"]
+    device = "clear"
+    if graph_type == 1: ## individual signals
+        end_ts = blond.min_time_of_end["time"]
 
     requested_time = time(hour,minute,second)
     distance_to_end = get_time_diff(requested_time, end_ts)
     if distance_to_end+1 < 10:
         max_duration = distance_to_end+1
-        return [{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i/10.0)+" sec","value":i/10.0} for i in range(1,(max_duration*10)+1)]
+        return [{"label":"Duration in Seconds", "value":"None"}]+ [{"label":str(i)+" sec","value":i} for i in range(1,max_duration+1)]
     else:
-        return time_options["duration"]
+        return time_options["default"]["duration"]
 
 @app.callback(
     Output("graph", "figure"),
@@ -256,38 +289,37 @@ def update_duration_options(hour,minute,second):
 )
 def update_graph(graph_type,phase,hour,minute,second,duration):
 
-    if not(type(hour) == int and type(minute)==int and type(second) ==int and type(duration) == float) :
+    if not(type(hour) == int and type(minute)==int and type(second) ==int and type(duration) == int) :
         return 0
     the_mode= "markers+lines"
     title = ""
-    data_fields = ""
+    devices = ""
     sps = 0
     #print(blond.list_files().keys())
     if graph_type == 0: ## aggregated signals
         title = "Aggregated Signals"
-        data_fields = ["clear"]
+        devices = ["clear"]
         sps = 50000
     elif graph_type == 1: ## individual signals
         title = "Individual Signals"
-        data_fields = [key for key in blond.list_files().keys() if key.startswith("medal")]
+        devices = [key for key in blond.list_files().keys() if key.startswith("medal")]
+        print(devices)
         sps = 6400
 
 
     requested_time = time(hour,minute,second)
+    end_time = increment_time(requested_time, seconds=duration-1)
     graph_list = []
-    for data_field in data_fields:
-        file_index = blond.find_corresponding_file(requested_time, blond.time_stamps[data_field])
-        time_diff = get_time_diff(requested_time , blond.time_stamps[data_field][file_index])
-        data_index_shift = time_diff * sps
-        temp_data = blond.list_files()[data_field][file_index]["current"+str(phase)][data_index_shift:data_index_shift + int(sps*duration)]
+    for device in devices:
+        temp_data = blond.read_data( device=device,signal="current"+str(phase),start_ts=requested_time, end_ts=end_time)
         len_data = temp_data.shape[0]
-        #print("length of "+data_field + "is:"+str(len_data))
+        #print("length of "+device + "is:"+str(len_data))
         #print()
         temp_graph = go.Scatter(
             x = np.linspace(1,15,len_data),
             y = temp_data[()],
             mode=the_mode,
-            name=data_field.title()
+            name=device.title()
         )
         graph_list.append(temp_graph)
 

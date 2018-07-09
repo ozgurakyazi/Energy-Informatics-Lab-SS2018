@@ -13,6 +13,14 @@ def get_time_diff(t1,t2):
     delta_s = max([t1_s, t2_s]) - min([t1_s, t2_s])
     return delta_s
 
+def increment_time(t1,minutes=0,seconds=0):
+    prev_date = datetime.combine(date.today(), t1)
+    new_date=  prev_date + timedelta(minutes = minutes,seconds=seconds)
+
+    if prev_date.date() != new_date.date(): ## this means that, the minute increment yielded a date change. So we should return 23:59:59 as the time
+        return time(23,59,59)
+
+    return new_date.time()
 class Blond(object):
     """
         class blond: attributes: date, list of files
@@ -20,19 +28,42 @@ class Blond(object):
     _SD_centered = []
     _SD_calibrated = []
 
-    def __init__(self, date, start_ts, end_ts ,day_data = {}):
+    def __init__(self, date,day_data = {}):
         self.date = date
         self._day_data = day_data
         self.time_stamps = {}
-        self.start_ts=start_ts
-        self.end_ts=end_ts
-        self._read_files()
         self.sps = {"clear":50000, "medals":6400}
+        self.time_limits = {}
+        self.minute_per_file = {"clear":5,"medals":15}
+        self._read_files()
+        self._determine_limits()
 
     def list_files(self):
         return self._day_data
 
 
+    def _determine_limits(self):
+        """
+        This function determines minimum of the end times and maximum of the start times
+        among all medals. Because in dashboard application,
+        we show all the medal data together, we have to decide on the strict
+        bounds on the time. For example, after 23:30:30 medal-2 does not contain
+        any data but, medal-1 contains. We can only the data until 23:30:30.
+        """
+        max_of_start = {"time":time(0,0,0),"device":"None"}
+        min_of_end = {"time":time(23,59,59),"device":"None"}
+        for temp_device in self.time_limits.keys():
+            if temp_device == "clear": ## here we are determining time limits for the medals. so clear is excluded
+                continue
+            if max_of_start["time"]<self.time_limits[temp_device]["earliest"]:
+                max_of_start["time"] = self.time_limits[temp_device]["earliest"]
+                max_of_start["device"]=temp_device
+            if min_of_end["time"]>self.time_limits[temp_device]["latest"]:
+                min_of_end["time"] = self.time_limits[temp_device]["latest"]
+                min_of_end["device"]=temp_device
+
+        self.max_time_of_start = max_of_start
+        self.min_time_of_end = min_of_end
     @staticmethod
     def _regex_map(pattern, strings_list):
 
@@ -71,25 +102,9 @@ class Blond(object):
         timestamps = list(map(lambda ts: datetime.strptime(ts, time_format ).time(), timestamps))
         timestamps.sort()
 
-        minute_per_file = 15 ## default is the minutes of medal files
-        if is_clear == 1: # if the read file is clear file
-            minute_per_file = 5 # minutes of the clear files
-        latest_possible_time = timestamps[-1]
-        ## get the latest possible time from the files.
-        latest_possible_time = (datetime.combine(date.today(), latest_possible_time) + timedelta(minutes = minute_per_file)).time()
 
-        """ get the first file timestamp"""
-        file_index = self.find_corresponding_file(self.start_ts,timestamps)
-        #print("start file index:"+str(file_index))
-        if file_index < 0 or self.end_ts>latest_possible_time: #no file found
-            print("Error: The requested time frame is not found in the files of " + path_to_files)
-            raise
-            return [],[]
-
-        del timestamps[0:file_index] # remove the files before our start files
         """add first file to the rest"""
-        res_timestamps = [timestamps[0]] + [ts for ts in timestamps if self.start_ts < ts <= self.end_ts]
-        timestamps_filter= map(lambda ts: datetime.combine(self.date, ts).strftime(time_format), list(res_timestamps))
+        timestamps_filter= map(lambda ts: datetime.combine(self.date, ts).strftime(time_format), list(timestamps))
 
         res_list = []
         for ts in timestamps_filter:
@@ -103,8 +118,7 @@ class Blond(object):
                 temp_file = h5py.File(path_to_files + a_file, 'r')
                 temp_file.close()
                 data.append(h5py.File(path_to_files + a_file,'r+'))
-
-        return data , res_timestamps
+        return data , timestamps
 
 
     def _read_files(self):
@@ -123,7 +137,12 @@ class Blond(object):
         self._day_data['clear'], self.time_stamps["clear"] = self._read_files_from_folder(files_all,path_to_clear,is_clear=1)
         #self._day_data['clear'] = [h5py.File(path_to_clear + file_name,'r+') for file_name in target_files]
 
-
+        latest_possible_time = self.time_stamps["clear"][-1]
+        ## get the latest possible time from the files.
+        latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["clear"])
+        self.time_limits["clear"] = {"latest":0,"earliest":0}
+        self.time_limits["clear"]["latest"] = latest_possible_time
+        self.time_limits["clear"]["earliest"] = self.time_stamps["clear"][0]
 
         """READING MEDAL UNITS"""
 
@@ -133,13 +152,31 @@ class Blond(object):
         for folder in folders_list:
             files_all = next(os.walk(folder))[2]
             medal_name = re.search(r'(medal-\d+)', folder).group(1)
+
             self._day_data[medal_name], self.time_stamps[medal_name] = self._read_files_from_folder(files_all,folder)
+            latest_possible_time = self.time_stamps[medal_name][-1]
+            ## get the latest possible time from the files.
+            latest_possible_time = increment_time(t1=latest_possible_time,minutes=self.minute_per_file["medals"])
+            print("latest possible.")
+            print(latest_possible_time)
+            self.time_limits[medal_name] = {"latest":0,"earliest":0}
+            self.time_limits[medal_name]["earliest"]= self.time_stamps[medal_name][0]
+            self.time_limits[medal_name]["latest"] = latest_possible_time
+            print(medal_name)
+            print(self.time_limits[medal_name])
             #self._day_data[medal_name] = [h5py.File(folder + file_name,'r+') for file_name in target_files]
 
     def read_data(self, device,signal,start_ts, end_ts):
-        if start_ts<self.start_ts or end_ts>self.end_ts: # if the requested times are not between possible latest and earliest times
-            print("No files are returned, since the requested time interval exceeds the possible times")
-            print("Please try initiating Blond object with a wider interval using start_ts and end_ts parameters")
+        print("device:"+device)
+        print("start:"+str(start_ts))
+        print("end:"+str(end_ts))
+
+        print("limit start:"+str(self.time_limits[device]["earliest"]))
+        print("limit end:"+str(self.time_limits[device]["latest"]))
+
+        if start_ts<self.time_limits[device]["earliest"] or end_ts>self.time_limits[device]["latest"]: # if the requested times are not between possible latest and earliest times
+            print("No data is returned, since the requested time interval exceeds the possible times in your "+ device + " data")
+            print("Please try provide more data under "+ device)
             return []
 
         current_sps = self.sps["medals"]
@@ -147,12 +184,15 @@ class Blond(object):
             current_sps = self.sps["clear"]
         start_file_index = self.find_corresponding_file(start_ts,self.time_stamps[device])
         start_diff = get_time_diff(start_ts, self.time_stamps[device][start_file_index]) # calculate how many seconds to ignore in the first file
-
         res_timestamps_ind =[i for i,ts in enumerate(self.time_stamps[device]) if start_ts < ts <= end_ts] ##
-        end_file_index = res_timestamps_ind[-1]
-        del res_timestamps_ind[-1]
-        end_diff = get_time_diff(end_ts, self.time_stamps[device][end_file_index]) # calculate how many seconds to include in the last file
+        end_file_index = 0
+        if len(res_timestamps_ind)==0: ## this means we only read from 1 file. all the data asked is stored in one file.
+            end_file_index = start_file_index
+        else:
+            end_file_index = res_timestamps_ind[-1]
+            del res_timestamps_ind[-1]
 
+        end_diff = get_time_diff(end_ts, self.time_stamps[device][end_file_index]) # calculate how many seconds to include in the last file
         range_start =  start_diff*current_sps
         range_end =  (end_diff+1)*current_sps # we include the last second. so times are inclusive
         if start_file_index==end_file_index: ## if we will be reading from only 1 file
@@ -164,7 +204,6 @@ class Blond(object):
 
 
         result_data += self._day_data[device][end_file_index][signal][0:range_end].tolist()
-
         return np.array(result_data)
     """ center_inplace and calibrate inplace read file-by-file, do the corresponding operations and write back
         good thing: we can process much more files like that and not be bounded by memory since each file is less than 3 GB
