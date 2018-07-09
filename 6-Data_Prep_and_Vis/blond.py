@@ -258,3 +258,15 @@ class Blond(object):
             data_calibrated[dict_signal['signal']] = ((data['values'] + data['DC_offset']) * data['calibration_factor']).astype("<f4")
 
         return data_calibrated
+
+    def center_and_calibrate_all(self):
+        for medal_name in self.list_files().keys():
+            for i in range(1,7):
+                if medal_name == "clear": ## in clear, we only of current1..3,
+                    if i==4:
+                        break
+                print("Centering and Calibrating: "+ medal_name + " current"+str(i) )
+                """Raw signal with offset and calibration factor attributes"""
+                dict_signal = self.dict_read_signal(medal_name, "current"+str(i))
+                """calibrated signal for clear"""
+                self.center_and_calibrate(dict_signal)

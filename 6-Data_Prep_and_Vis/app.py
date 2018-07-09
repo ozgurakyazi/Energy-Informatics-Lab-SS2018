@@ -15,32 +15,8 @@ from blond import Blond, get_time_diff,increment_time
 """Read MEDAL and CLEAR data """
 blond = Blond(date(2016,10,5))
 
-"""Checking if files have been retrieved"""
-print("list the files:")
-print(blond.list_files())
-
-##########################
-"""signals acquisited by MEDAL"""
-print("Files from Medal 1")
-medal_file = blond.list_files()['medal-2'][0]
-print(type(medal_file["current1"]))
-print([key for key in medal_file.keys()])
-##########################
-"""signals acquisited by CLEAR"""
-print("Keys from CLEAR")
-clear_file = blond.list_files()['clear'][0]
-print([key for key in clear_file.keys()])
-##########################
-device = 'medal-2'
-signal = 'current1'
-
-"""Raw signal with offset and calibration factor attributes"""
-dict_signal = blond.dict_read_signal(device, signal)
-print(dict_signal)
-
-
-"""calibrated signal"""
-blond.center_and_calibrate(dict_signal)
+"""calibrate and center the signals"""
+blond.center_and_calibrate_all()
 ##########################
 
 def create_options(device):
